@@ -148,15 +148,11 @@ __Body__ lots of information, typically contains HTML to be rendered on a page
 
 Below is a diagram of a request-response cycle.
 
-INSERT DIAGRAM
-
+![request-response](request_response.jpg)
 
 In __Rails__ land, Rails comes with its own server. When this server receives an HTTP request, it sends it to the __Rails Router__. This router takes in the request and decides where to send it - which controller and which method inside of that controller. For example, a `GET /users` would typically call the `index` method inside of `users_controller.rb`. __A new instance of a controller is instantiated for every single request-response cycle. Once a cycle is complete, the instance is destroyed.__ Side note: naming conventions are extremely important for Rails to figure out where to send requests. Below is a diagram of a request-response cycle in Rails.
 
-INSERT DIAGRAM
-
-
-
+![request-response-rails](request_response_rails.jpg)
 
 
 ### QUESTION: How do all of the MVC components connect? 
@@ -381,17 +377,18 @@ Perhaps we also want a page where a user can edit their cat in the cat database.
 </form>
 ```
 
-
 __Checklist for Rails MVC Setup__
-- [ ] Initialize a rails project
-- [ ] Setup your database via migrations
+- [ ] Initialize a rails project (``)
+- [ ] Setup your project's database (`bundle exec rails db:setup`)
+- [ ] Setup your database via migrations (`bundle exec rails g migration CreateCats`)
+- [ ] Run your migrations (`bundle exec rails db:migrate`)
 - [ ] Create models (one for each table in your database)
   - [ ] Add validations
   - [ ] Add associations
   - [ ] Add custom methods/validations
+- [ ] Add routes to your `routes.rb` file that map your HTTP verb and url to specific controller actions
 - [ ] Create controllers (one for each model)
 - [ ] Create views (one for each page that you would want to render from your controllers)
-
 
 
 ### QUESTION: Params vs. Session vs. Flash vs. Flash.now
