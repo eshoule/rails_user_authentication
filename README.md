@@ -179,8 +179,7 @@ We want to keep our controllers as slim as possible. This means we want to abstr
 Run this command
 `rails g migration CreateCats`
 
-It will create this file in `/db/migrate/`
-`20180714033817_create_cats.rb`
+It will create this file `/db/migrate/20180714033817_create_cats.rb`
 ```ruby
 class CreateCats < ActiveRecord::Migration[5.1]
   def change
