@@ -33,7 +33,7 @@ class UsersController < ApplicationController
 end
 ```
 
-#### SUBQUESTION: But what if I don't want the `require_no_user!` method to run before every action? What if I wan't any user (logged in or not) to be able to view users' profile pages?
+#### SUBQUESTION: But what if I don't want the `require_no_user!` method to run before every action? What if I want any user (logged in or not) to be able to view users' profile pages?
 
 Good news! Much like you can restrict the routes you generate in `routes.rb` by doing something like `resources :users, only: [:new, :create, :show]`, you can pass a hash with the key `:only` and an array of symbols (actions) as the value! (`:except` also works).
 
