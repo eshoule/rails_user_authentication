@@ -219,7 +219,7 @@ In __Rails__ land, Rails comes with its own server. When this server receives an
 
 The below diagram illustrates the connections between the MVC components. The next question also provides details with respect to creating each one of theses components.
 
-![mvc_connection](mvc_connection.jpg)
+![mvc_connection](mvc_connection_updated.jpg)
 
 
 ### QUESTION: How do we systematically set up the controllers and views? What’s the best way to build out logic in views vs. controllers? I want a checklist of how to setup my rails application!
