@@ -463,6 +463,126 @@ The below diagram illustrates how each of these storage options workd within Rai
 ![rails_info_storage](rails_info_storage.jpg)
 
 
+### QUESTION: Why would I nest a resource? How do I pass a foreign key into params if the resource is not nested?
+It's common to have resources that are the 'children' of other "resources". Consider your application has these models
+
+```ruby
+# app/models/post.rb
+class Post < ApplicationRecord
+  has_many :comments
+end
+
+# app/models/comment.rb
+class Comment < ApplicationRecord
+  belongs_to :post
+end
+```
+
+Nested routes allow you to capture this relationship in your routing. In this case, you could include this route declaration:
+
+```ruby
+# config/routes.rb
+Bluebird::Application.routes.draw do
+  resources :posts do
+    # provides a route to create a comment for a given post.
+    resources :comments, only: :post
+  end
+end
+```
+
+This generates a `/posts/:post_id/comments` route. Requests for this route will be sent to the CommentsController#create action. Let's take a look at the corresponding view and controller we could use to complete a `POST` request to `/posts/:post_id/comments`.
+
+`/views/comments/new.html.erb`
+```html
+<h1>New Comment</h1>
+<form class='form' action="<%= posts_url %>" method="post">
+  <input
+    type="hidden"
+    name="authenticity_token"
+    value="<%= form_authenticity_token %>">
+
+  <label for='new-comment'>Comment</label>
+  <input id='new-comment' type="text" name="comment[body]">
+
+  <input type="submit" value="Submit">
+</form>
+```
+
+```ruby
+class CommentsController
+
+  # When we make our POST request to /posts/:post_id/comments
+  # Rails extracts the wildcard post_id from the path and
+  # puts that information in our params under a top-level key.
+  # The rest of your information should come from your 'Add Comment'
+  # form. Your params will have the following structure
+  # params: { post_id: 1, post: {body: 'this is my post'}}
+
+  def create
+    @comment = Comment.new(comment_params)
+    @comment.post_id = comment_params
+    if @comment.save
+      redirect_to post_url(@comment.post_id)
+    else
+      flash.now[:errors] = @comment.errors.full_messages
+      render :new
+    end
+  end
+
+  def comment_params
+    params.require(:comment).permit(:body)
+  end
+end
+```
+
+If we don't want to nest our resources, __what is another way we could get a foreign key into our params__? The answer to this is to put the `Add Comment` form in the `shot.html.erb` view for a `Post`. When we do this, we can include a __hidden input__ in the `Add Comment` form! Let's take a look at how we can accomplish this with a `POST` request to `/comments`.
+
+`/views/posts/show.html.erb`
+```html
+<h1>This is my post!</h1>
+  <h2>@post.text</h2>
+
+  <h1>New Comment</h1>
+  <form class='form' action="<%= comments_url %>" method="post">
+    <input
+      type="hidden"
+      name="authenticity_token"
+      value="<%= form_authenticity_token %>">
+
+    # This hidden input passes our post_id into our params!
+    <input type="hidden" name="comment[post_id]" value="<%= @post.id %>">
+
+    <label for='new-comment'>Comment</label>
+    <input id='new-comment' type="text" name="comment[body]">
+
+    <input type="submit" value="Submit">
+  </form>
+```
+
+```ruby
+class CommentsController
+
+  # When we make our POST request to /posts all of the information 
+  # is now coming from the 'Add Comment' form, which is on the post show 
+  # page. Your params will have the following structure
+  # params: { post: {body: 'this is my post', post_id: 1}}
+
+  def create
+    @comment = Comment.new(comment_params)
+    if @comment.save
+      redirect_to post_url(@comment.post_id)
+    else
+      flash.now[:errors] = @comment.errors.full_messages
+      render :new
+    end
+  end
+
+  def comment_params
+    params.require(:comment).permit(:body, :post_id)
+  end
+end
+```
+
 ### QUESTION: What’s up with the password= and why do we have a reader on our password?
 When we sign up or log in a user, we get a username and a password in our params;  however, we do not actually save the password in our users table in our database for security reasons. As a result, we need a way to convert our password into a password_digest (this is what we save in the database). We also want to still be able to validate our password (e.g. password length) even though it is not being saved in the database. In order to accomplish these two tasks (convert password to password_digest and validate our password), we write some additional methods in our User model.
 
