@@ -433,7 +433,8 @@ Perhaps we also want a page where a user can edit their cat in the cat database.
 ```
 
 __Checklist for Rails MVC Setup__
-- [ ] Initialize a rails project (``)
+- [ ] Initialize a rails project using postgres (`rails new myapp --database=postgresql`)
+- [ ] Add necessary gems to the Gemfile and bundle (`bundle install`)
 - [ ] Setup your project's database (`bundle exec rails db:setup`)
 - [ ] Setup your database via migrations (`bundle exec rails g migration CreateCats`)
 - [ ] Run your migrations (`bundle exec rails db:migrate`)
