@@ -10,7 +10,7 @@ class UsersController < ApplicationController
 
   def create
     @user = User.new(user_params)
-    
+
     if @user.save
       login_user!(@user)
       redirect_to cats_url
@@ -26,7 +26,50 @@ class UsersController < ApplicationController
   end
 
   private
-  
+
+  def user_params
+    params.require(:user).permit(:password, :username)
+  end
+end
+```
+
+#### SUBQUESTION: But what if I don't want the `require_no_user!` method to run before every action? What if I wan't any user (logged in or not) to be able to view users' profile pages?
+
+Good news! Much like you can restrict the routes you generate in `routes.rb` by doing something like `resources :users, only: [:new, :create, :show]`, you can pass a hash with the key `:only` and an array of symbols (actions) as the value! (`:except` also works).
+
+```ruby
+class UsersController < ApplicationController
+  before_action :require_no_user!, only: [:create, :new]
+
+  def create
+    @user = User.new(user_params)
+
+    if @user.save
+      login_user!(@user)
+      redirect_to cats_url
+    else
+      flash.now[:errors] = @user.errors.full_messages
+      render :new
+    end
+  end
+
+  def new
+    @user = User.new
+    render :new
+  end
+
+  # require_no_user! will NOT be run before this method
+  def show
+    @user = User.find_by(id: params[:id])
+    if @user
+      render :show
+    else
+      redirect_to cats_url
+    end
+  end
+
+  private
+
   def user_params
     params.require(:user).permit(:password, :username)
   end
@@ -34,29 +77,37 @@ end
 ```
 
 
+
 ### QUESTION: What’s the difference between `before_validation` and `after_initialize`?
-`before_validation` is a method that will invoke another method before any of the other model validations are run (by calling `.save` or `.valid?`). `after_initialize` is a method that will invoke another method after an instance of a model is initialized (by calling `.new`). 
+`before_validation` is a method that will invoke another method before any of the other model validations are run (by calling `.save` or `.valid?`). `after_initialize` is a method that will invoke another method after an instance of a model is initialized (by calling `.new`).
 
 ```ruby
 def User < ApplicationRecord
   after_initialize :some_custom_method
-  before_validation :some_custom_method
-  
+  before_validation :some_other_custom_method
+
+  # Runs right after a User is initialized
   def some_custom_method
     # important code
   end
+
+  # Runs right before a User instance is validated
+  def some_other_custom_method
+    # important code
+  end
+
 end
 
 # This line of code initializes a new instance of a user by calling .new
-# Once the user is initialized, the after_initialize will run the 
+# Once the user is initialized, the after_initialize will run the `some_custom_method` method
 user1 = User.new(username: 'Liz', password: 'password')
 
-# This line of code will run before_validation and then all model validations
+# This line of code will run before_validation (in this case the `some_other_custom_method` method), and then all model validations
 # Model validations are run when we call `.save` or `.valid?`
 user1.save
 ```
 
-Most of the time it does not matter whether you use `before_validation` or `after_initialize`.
+**N.B** Most of the time it does not matter whether you use `before_validation` or `after_initialize`.
 
 
 ### QUESTION: Where do we put the logout button in Rails views?
@@ -73,7 +124,7 @@ We typically want the user to be able to see this on every page when navigating 
     <% else %>
       <%= current_user.username %>
 
-      # This is the logout button and it will 
+      # This is the logout button and it will
       # always be at the top of the page if the user
       # is logged in
       <form action="<%= session_url %>" method="post">
@@ -97,9 +148,13 @@ We typically want the user to be able to see this on every page when navigating 
 ### QUESTION: What is a session?
 When we refer to a session, we are talking about the process of logging in and logging out on an application. Creating a new session is the same as logging in, and destroying a session is the same as logging out. Calling the `new` method in a session controller renders the `new.html.erb` view, which is the login page. In order to achieve this functionality in our applications, we must have RESTful routes to create and destroy our session, and render a login page. This means in our `routes.rb` file we define session routes like this
 
-`resource session, only: [:new, :create, :destroy]`
+`resource :session, only: [:new, :create, :destroy]`
 
-At this point in time, we use `resource` instead of `resources` because we are only allowing the user to have one session at a time. This means several things (1) a user can only be logged in on one device at a time (2) we do not need a table for session (3) when we create and destroy a session, we do not need to provide an id (4) the routes will look like this
+At this point in time, we use `resource` instead of `resources` because we are only allowing the user to have one session at a time. This means several things:
+1. a user can only be logged in on one device at a time
+2. we do not need a table for session
+3. when we create and destroy a session, we do not need to provide an id
+4. the routes will look like this
 
 ```
 GET      /session/new   sessions#new
@@ -110,18 +165,18 @@ DELETE   /session       sessions#destroy
 #### But what about the Rails session...
 When we make a `POST` request to `/session` and call the `create` method in the `sessions_controller.rb` file, we want to attempt to log in the user whose information we entered in the login form. In order to log in a user, we must use the `session` that rails gives us. __This session is a place to store data during one request that can be read during later requests.__ We tell our application to compare the `session[:session_token]` value to our user's `session_token` value (saved in the user database) to determine whether a user is logged in or not. If `session[:session_token] == user.session_token`, then the user is logged in; otherwise, the user is logged out.
 
-__A session is both (1) a general term representing the process of logging in/logging out AND (2) an object that rails gives us to store data that will persist across many request-response cycles.__ 
+__A session is both (1) a general term representing the process of logging in/logging out AND (2) an object that rails gives us to store data that will persist across many request-response cycles.__
 
 
 ### QUESTION: Why do we have both database and model level validations?
-Database level validations are truly the only thing protecting us from someone inserting unwanted information into the database. This is because a person could byepass our application and attempt to insert something directly into the database. However, if a database validation fails, we throw a nasty 500-level error. Thus, model-level validations are primarily for UI. If a user attempts to sign up, we want to be able to display a nice error message and have them try again, rather than going directly to the database, attempting to save a user, and getting a 500 error that disrupts our application. Model validations are run whenever we call `.save` or `.update` on the instance of our model. If these calls fail, we say that they `fail softly`. If we used `.save!` instead, then that would throw the database errors instead, and we would say that it `fails loudly`. 
+Database level _constraints_ are truly the only thing protecting us from someone inserting unwanted information into the database. This is because a person could bypass our application and attempt to insert something directly into the database. However, if a database constraint fails, we throw a nasty 500-level error. Thus, model-level _validations_ are primarily for UI. If a user attempts to sign up, we want to be able to display a nice error message and have them try again, rather than going directly to the database, attempting to save a user, and getting a 500 error that disrupts our application. Model validations are run whenever we call `.save` or `.update` on the instance of our model. If these calls fail, we say that they `fail softly`. If we used `.save!` instead, then that would throw the database errors instead, and we would say that it `fails loudly`.
 
 Consider the below code...
 
 ```ruby
 def create
     @user = User.new(user_params)
-    
+
     if @user.save
       login_user!(@user)
       redirect_to cats_url
@@ -135,7 +190,7 @@ def create
 If we used `@user.save!` instead of `@user.save`, we would never go into the else statement where we render errors. Instead, the database error would disrupt our application. Using `@user.save` allows us to go into the else statement if a model-level validation fails, and then we can show our use some nice error messages.
 
 ### QUESTION: What is the request-response cycle?
-When a user is interacting with a browser, they do things such as click a button or type in a url and hit enter, which will initiate a request-response cycle. For example, if a user types `www.google.com` into a browser and presses enter, they will initiate an HTTP request, which is sent to google's server, which will decide what to do and how to respond to the request. The response will be sent back to the client (user's browser) and will update the browser accordingly. 
+When a user is interacting with a browser, they do things such as click a button or type in a url and hit enter, which will initiate a request-response cycle. For example, if a user types `www.google.com` into a browser and presses enter, they will initiate an HTTP request, which is sent to google's server, which will decide what to do and how to respond to the request. The response will be sent back to the client (user's browser) and will update the browser accordingly.
 
 __HTTP Requests__ - contain three major components
 __Method__ (e.g. POST, GET, PATCH, DELETE)
@@ -155,16 +210,16 @@ In __Rails__ land, Rails comes with its own server. When this server receives an
 ![request-response-rails](request_response_rails.jpg)
 
 
-### QUESTION: How do all of the MVC components connect? 
+### QUESTION: How do all of the MVC components connect?
 1. __Migrations__ - these define the structure of our database. This is where we tell our application which tables and columns we want in our database and any database-level constraints (uniqueness, null, etc.). All table names are plural (e.g. `users`).
 2. __Models__ (M of MVC) - every table in our database is represented by a model, and an instance of a model represents a single row in a table. The purpose of a model is to create ruby objects from information in our database so that we can interact with it in our application and perform basic CRUD operations. All model file and class names are singular (e.g. `user.rb` and `class User`).
 3. __Routes__ (`routes.rb`) - these define the connection between an HTTP verb, url, and controller action. We often try to create RESTful routes.
-4. __Controllers__ (C of MVC) - these take in HTTP requests, decide what to do with them, and how to respond. Each model has it's own controller, and the methods inside of a controller should allow us to perform basic CRUD (create, read, update, delete) operations. The operation that is performed is determined by the method that is called. For example, an HTTP request of `POST /users`, should call the `create` method in the `UsersController`, which will create a new user and save it into the database. Every method in a controller must either `redirect_to` a url (`redirect_to users_url`) OR `render` a view (`render :new`).
-5. __Views__ (V of MVC) - this is the HTML that a client sees in their browser. They use instance variable defined in the associated controller method (`index.html.erb` would have access to instance variables defined in `def index` in the controller) to render information dynamically. 
+4. __Controllers__ (C of MVC) - these take in HTTP requests, decide what to do with them, and how to respond. Each API endpoint (aka a resource you have defined in your routes.rb file) has it's own controller, and the methods inside of a controller should allow us to perform basic CRUD (create, read, update, delete) operations. The operation that is performed is determined by the method that is called. For example, an HTTP request of `POST /users`, should call the `create` method in the `UsersController`, which will create a new user and save it into the database. Every method in a controller must either `redirect_to` a url (`redirect_to users_url`) OR `render` a view (`render :new`).
+5. __Views__ (V of MVC) - this is the HTML that a client sees in their browser. They use instance variables defined in the associated controller method (`index.html.erb` would have access to instance variables defined in the `index` method in the controller) to render information dynamically.
 
 The below diagram illustrates the connections between the MVC components. The next question also provides details with respect to creating each one of theses components.
 
-![mvc_connection](mvc_connection.jpg)
+![mvc_connection](mvc_connection_updated.jpg)
 
 
 ### QUESTION: How do we systematically set up the controllers and views? What’s the best way to build out logic in views vs. controllers? I want a checklist of how to setup my rails application!
@@ -196,7 +251,7 @@ end
 2. __Create a Model__: Create a model to represent this table (post.rb, class Post). This involves writing validations, associations, and any custom methods. An instance of a model is created every time we call `Cat.new`.
 
 `cat.rb`
-```ruby 
+```ruby
 class Cat < ApplicationRecord
   # freeze ensures that constants are immutable
   CAT_COLORS = %w(black white orange brown).freeze
@@ -219,8 +274,8 @@ class Cat < ApplicationRecord
 end
 ```
 
-3. __Define Routes__: Determine which routes you want for your resource. If you only want someone to have the ability to create and delete a post, then you only need routes for :create and :delete.
- 
+3. __Define Routes__: Determine which routes you want for your resource. If you only want someone to have the ability to create and delete a post, then you only need routes for `:create` and `:delete`.
+
 ```ruby
 Rails.application.routes.draw do
   resources :cats, except: :destroy
@@ -264,7 +319,7 @@ class CatsController < ApplicationController
     @cat = current_user.cats.find(params[:id])
     render :edit
   end
-  
+
   def update
     @cat = current_user.cats.find(params[:id])
     debugger
@@ -309,7 +364,7 @@ end
 Perhaps we also want a page where a user can edit their cat in the cat database. This would likely be rendered from the `edit` method in the `CatsController`, which means we would create a view `/cats/edit.html.erb`. Inside of this view we would likely want a form where we can input/change our cat's information, and once we press the `submit` button, we will make an HTTP request with a method and path defined in our form, and a body that includes all of the data input in the form (name, birthdate, color, sex). The below form has some important components to note:
   - `action="<%= cat_url(@cat) %>"`, which defines the HTTP path (`/cats/:id`)
   - `method="post"`, which defines the HTTP verb (`POST`)
-  - `<input type="hidden" name="_method" value="patch">` which overwrites the `POST` verb to be a `PATCH`. HTML forms are not allowed to have any other method besides `POST` or `GET`, and thus we must provide a hidden input to overwrite the method with the one we actually want. If you look at your params in your controller, once this form is submitted, params will have the key-value pair of `{"_method"="patch"}`. 
+  - `<input type="hidden" name="_method" value="patch">` which overwrites the `POST` verb to be a `PATCH`. HTML forms are not allowed to have any other method besides `POST` or `GET`, and thus we must provide a hidden input to overwrite the method with the one we actually want. If you look at your params in your controller, once this form is submitted, params will have the key-value pair of `{"_method"="patch"}`.
   - `authenticity_token input`, which puts a key-value pair of `{"authenticity_token"="somerandomstring"}` in your params, which will tell rails the request is safe in order to protect against CSRF attacks.
   - the `name=` in all of the inputs merely designates under which key/keys that information is defined in your params. For example `name=cat[name]`, creates the following in your params `{"cat": {"name": "mycatsname"}}`.
 
@@ -477,7 +532,7 @@ We are logged in if `session[:session_token] == user.session_token`. The below c
 class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception
 
-  # Expose current_user method to the views
+  # Expose current_user and logged_in? methods to the views
   helper_method :current_user
   helper_method :logged_in?
 
@@ -517,7 +572,7 @@ end
   <a href="<%= new_user_url %>">Sign up</a>
 <% else %>
   <%= current_user.username %>
-  # This is the logout button and it will 
+  # This is the logout button and it will
   # always be at the top of the page if the user
   # is logged in
   <form action="<%= session_url %>" method="post">
